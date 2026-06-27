@@ -75,13 +75,37 @@ export function Navbar() {
               href="/quests"
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
-                pathname.startsWith('/quests')
+                pathname === '/quests'
                   ? 'bg-[#5B3BEB]/10 text-[#5B3BEB]'
                   : 'text-muted-foreground hover:bg-accent hover:text-foreground'
               )}
             >
               <Zap className="h-5 w-5" />
               Quests
+            </Link>
+            <Link
+              href="/my-quests"
+              className={cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
+                pathname.startsWith('/my-quests')
+                  ? 'bg-[#5B3BEB]/10 text-[#5B3BEB]'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+              )}
+            >
+              <BarChart2 className="h-5 w-5" />
+              My Quests
+            </Link>
+            <Link
+              href="/create-quest"
+              className={cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
+                pathname.startsWith('/create-quest')
+                  ? 'bg-[#5B3BEB]/10 text-[#5B3BEB]'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+              )}
+            >
+              <Zap className="h-5 w-5" />
+              Create Quest
             </Link>
           </div>
         </nav>
