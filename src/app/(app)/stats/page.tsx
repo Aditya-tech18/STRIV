@@ -118,7 +118,7 @@ export default function StatsPage() {
             <YAxis hide />
             <Tooltip
               contentStyle={{ borderRadius: '12px', border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', fontSize: 12 }}
-              formatter={(v: number) => formatNumber(v)}
+              formatter={(v) => formatNumber(Number(v))}
             />
             <Line type="monotone" dataKey="views" stroke="#5B3BEB" strokeWidth={2} dot={false} />
             <Line type="monotone" dataKey="joins" stroke="#A78BFA" strokeWidth={2} dot={false} />

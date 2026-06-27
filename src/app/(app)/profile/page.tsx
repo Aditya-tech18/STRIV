@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Github, Linkedin, Globe, Flame, TrendingUp, CheckCircle, ExternalLink } from 'lucide-react'
+import { GitBranch, Link2, Globe, Flame, TrendingUp, CheckCircle, ExternalLink } from 'lucide-react'
 import { Avatar, Badge } from '@/components/ui/primitives'
 import { Button } from '@/components/ui/Button'
 import { cn, HEATMAP_COLORS, formatNumber } from '@/lib/utils'
@@ -76,10 +76,10 @@ export default function ProfilePage() {
           </p>
           <div className="flex items-center gap-2 mt-2">
             <a href="#" className="flex items-center gap-1 text-xs border border-border rounded-lg px-2 py-1 hover:bg-accent transition-colors">
-              <Github className="h-3.5 w-3.5" /> GITHUB
+              <GitBranch className="h-3.5 w-3.5" /> GITHUB
             </a>
             <a href="#" className="flex items-center gap-1 text-xs border border-border rounded-lg px-2 py-1 hover:bg-accent transition-colors">
-              <Linkedin className="h-3.5 w-3.5" /> LINKEDIN
+              <Link2 className="h-3.5 w-3.5" /> LINKEDIN
             </a>
             <a href="#" className="flex items-center gap-1 text-xs border border-border rounded-lg px-2 py-1 hover:bg-accent transition-colors">
               <Globe className="h-3.5 w-3.5" /> PORTFOLIO
