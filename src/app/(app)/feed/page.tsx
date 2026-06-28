@@ -1,126 +1,169 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
-import { useInfiniteQuery } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import Link from 'next/link'
-import { Compass, Loader2 } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContext'
-import { getFeedProofs } from '@/lib/api/feed'
-import { FeedSkeleton } from '@/components/feed/FeedSkeleton'
-import { ProofCard } from '@/components/feed/ProofCard'
+import { Flame, ThumbsUp, MessageCircle, Share2, PlusCircle, Zap } from 'lucide-react'
+import { Avatar, Badge } from '@/components/ui/primitives'
+import { Button } from '@/components/ui/Button'
+import { cn, formatRelativeTime, formatNumber } from '@/lib/utils'
+
+// Mock data representing real structure from Supabase
+const MOCK_POSTS = [
+  {
+    id: '1',
+    user: { full_name: 'Marcus Chen', combat_name: 'marcus.dev', avatar_url: null },
+    challenge: { title: '100 Days of Code', category: 'Coding' },
+    day: 45,
+    streak: 45,
+    content: 'Solved 3 Hard problems today focusing on Dynamic Programming. System optimization complete. No shortcuts, just discipline.',
+    image: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=600&q=80',
+    likes: 128,
+    comments: 24,
+    created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
+  },
+  {
+    id: '2',
+    user: { full_name: 'Elena Rodriguez', combat_name: 'elena.fit', avatar_url: null },
+    challenge: { title: '5AM Club', category: 'Fitness' },
+    day: 112,
+    streak: 112,
+    content: 'Upper body hypertrophy session completed. Increased volume by 5% from last week. Consistency is the only metric that matters.',
+    image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&q=80',
+    likes: 342,
+    comments: 15,
+    created_at: new Date(Date.now() - 4 * 3600000).toISOString(),
+  },
+  {
+    id: '3',
+    user: { full_name: 'Dr. Julian Vance', combat_name: 'dr.julian', avatar_url: null },
+    challenge: { title: 'Deep Work Protocol', category: 'Education' },
+    day: 89,
+    streak: 89,
+    content: '50 pages of "Antifragile" and summarized key mental models. Information retention is a habit. Compounding knowledge hourly.',
+    image: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=600&q=80',
+    likes: 89,
+    comments: 8,
+    created_at: new Date(Date.now() - 5 * 3600000).toISOString(),
+  },
+  {
+    id: '4',
+    user: { full_name: 'Arjun Sharma', combat_name: 'arjun.codes', avatar_url: null },
+    challenge: { title: '365 Days LeetCode', category: 'Coding' },
+    day: 124,
+    streak: 124,
+    content: 'Graph traversal — BFS and DFS patterns locked in. Every day compounds. 241 days remaining on the mission.',
+    image: null,
+    likes: 203,
+    comments: 32,
+    created_at: new Date(Date.now() - 7 * 3600000).toISOString(),
+  },
+]
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Coding: 'bg-blue-100 text-blue-700',
+  Fitness: 'bg-emerald-100 text-emerald-700',
+  Education: 'bg-amber-100 text-amber-700',
+}
 
 export default function FeedPage() {
-  const { profile, supabaseClient, loading: authLoading } = useAuth()
-  const router = useRouter()
-  const loadMoreRef = useRef<HTMLDivElement>(null)
-
-  // Redirect if no profile exists
-  useEffect(() => {
-    if (!authLoading && !profile?.id) {
-      router.replace('/login')
-    }
-  }, [authLoading, profile, router])
-
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    status,
-  } = useInfiniteQuery({
-    queryKey: ['feed', profile?.id],
-    queryFn: ({ pageParam }) => getFeedProofs(supabaseClient, profile!.id, pageParam),
-    initialPageParam: 0,
-    getNextPageParam: (lastPage, pages) => (lastPage.length === 10 ? pages.length : undefined),
-    enabled: !!profile?.id,
-  })
-
-  // Intersection Observer for infinite scrolling
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
-          fetchNextPage()
-        }
-      },
-      { threshold: 0.5 }
-    )
-
-    const currentRef = loadMoreRef.current
-    if (currentRef) observer.observe(currentRef)
-
-    return () => {
-      if (currentRef) observer.unobserve(currentRef)
-    }
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage])
-
-  if (authLoading || status === 'pending') {
-    return (
-      <div className="min-h-screen bg-[#0A0A0A] pt-6 px-4">
-        <FeedSkeleton />
-      </div>
-    )
-  }
-
-  if (status === 'error') {
-    return (
-      <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center p-4">
-        <p className="text-red-500 font-semibold">Failed to load feed.</p>
-        <button 
-          onClick={() => window.location.reload()} 
-          className="mt-4 px-4 py-2 bg-white/10 rounded-lg text-sm hover:bg-white/20 transition"
-        >
-          Try Again
-        </button>
-      </div>
-    )
-  }
-
-  const proofs = data.pages.flat()
-  const isEmpty = proofs.length === 0
+  const [liked, setLiked] = useState<Record<string, boolean>>({})
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] pt-4 sm:pt-8 px-4 pb-24">
-      <div className="max-w-lg mx-auto w-full">
-        <h1 className="text-2xl font-black text-white tracking-tight mb-6">Home Feed</h1>
-        
-        {isEmpty ? (
-          <div className="bg-[#111111] rounded-2xl p-8 text-center border border-border/20 flex flex-col items-center mt-10 shadow-lg">
-            <div className="h-16 w-16 bg-[#5B3BEB]/10 rounded-full flex items-center justify-center mb-4">
-              <Compass className="h-8 w-8 text-[#5B3BEB]" />
+    <div className="space-y-0">
+      {/* Header actions */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex gap-3">
+          <Link href="/explore">
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <PlusCircle className="h-4 w-4" />
+              Join a Challenge
+            </Button>
+          </Link>
+          <Link href="/create">
+            <Button size="sm" className="gap-1.5">
+              <PlusCircle className="h-4 w-4" />
+              Create Challenges
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      {/* Tab */}
+      <div className="flex items-center gap-6 border-b border-border mb-6 pb-3">
+        <button className="text-sm font-bold text-foreground border-b-2 border-[#5B3BEB] pb-3 -mb-3">
+          Growth Feed
+        </button>
+        <button className="text-sm font-medium text-muted-foreground pb-3 -mb-3 hover:text-foreground transition-colors">
+          Recent Activity
+        </button>
+      </div>
+
+      {/* Posts */}
+      <div className="space-y-4">
+        {MOCK_POSTS.map((post) => (
+          <article key={post.id} className="feed-card rounded-2xl border border-border bg-card overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center gap-3 p-4 pb-3">
+              <Avatar src={post.user.avatar_url} name={post.user.full_name} size="md" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-sm">{post.user.full_name}</span>
+                  <span className="text-xs text-muted-foreground">• {formatRelativeTime(post.created_at)}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span>{post.challenge.title}</span>
+                  {post.challenge.category && (
+                    <span className={cn('rounded-full px-2 py-0.5 font-semibold', CATEGORY_COLORS[post.challenge.category] || 'bg-gray-100 text-gray-700')}>
+                      {post.challenge.category}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-full px-3 py-1">
+                <Flame className="h-3.5 w-3.5 text-amber-500 streak-flame" />
+                <span className="text-xs font-black text-amber-600 dark:text-amber-400">DAY {post.day}</span>
+              </div>
             </div>
-            <h2 className="text-xl font-bold text-white mb-2">No posts yet 👀</h2>
-            <p className="text-[#888888] text-sm mb-6 max-w-xs">
-              Follow people to see their progress, or start your own challenge to build your streak.
-            </p>
-            <Link 
-              href="/explore" 
-              className="bg-[#5B3BEB] text-white font-semibold py-2.5 px-6 rounded-xl shadow-[0_4px_16px_rgba(91,59,235,0.35)] hover:bg-[#4A2DD4] active:bg-[#3A1EC4] transition-colors"
-            >
-              Explore Challenges
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {proofs.map((proof) => (
-              <ProofCard 
-                key={proof.id} 
-                proof={proof} 
-                currentUserId={profile!.id} 
-                supabaseClient={supabaseClient} 
-              />
-            ))}
-            
-            {/* Infinite Scroll Trigger */}
-            <div ref={loadMoreRef} className="py-6 flex justify-center">
-              {isFetchingNextPage && <Loader2 className="h-6 w-6 animate-spin text-[#5B3BEB]" />}
-              {!hasNextPage && proofs.length > 0 && (
-                <p className="text-xs text-[#888888] font-semibold uppercase tracking-wider">You caught up!</p>
-              )}
+
+            {/* Content */}
+            {post.image && (
+              <div className="aspect-[16/9] overflow-hidden">
+                <img
+                  src={post.image}
+                  alt="Proof"
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+            )}
+            <div className="px-4 py-3">
+              <p className="text-sm text-foreground leading-relaxed">{post.content}</p>
             </div>
-          </div>
-        )}
+
+            {/* Actions */}
+            <div className="flex items-center gap-1 px-4 pb-4">
+              <button
+                onClick={() => setLiked((p) => ({ ...p, [post.id]: !p[post.id] }))}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-colors',
+                  liked[post.id]
+                    ? 'bg-[#5B3BEB]/10 text-[#5B3BEB]'
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                )}
+              >
+                <ThumbsUp className="h-4 w-4" />
+                {formatNumber(post.likes + (liked[post.id] ? 1 : 0))}
+              </button>
+              <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
+                <MessageCircle className="h-4 w-4" />
+                {post.comments}
+              </button>
+              <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold text-muted-foreground hover:bg-accent hover:text-foreground transition-colors ml-auto">
+                <Share2 className="h-4 w-4" />
+              </button>
+            </div>
+          </article>
+        ))}
       </div>
     </div>
   )

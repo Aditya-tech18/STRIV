@@ -4,178 +4,94 @@ import {
   createContext,
   useContext,
   useEffect,
-  useRef,
   useState,
   useCallback,
   type ReactNode,
 } from 'react'
 import { type User } from 'firebase/auth'
-import {
-  onAuthChange,
-  signInWithGoogle,
-  signOut as firebaseSignOut,
-} from '@/lib/firebase/config'
-import { createAuthenticatedClient, createClient } from '@/lib/supabase/client'
-import { type UserProfile, type UserRole } from '@/types'
-
-// ─── Context shape ────────────────────────────────────────────────────────────
+import { onAuthChange, signInWithGoogle, signOut, getIdToken } from '@/lib/firebase/config'
+import { createClient } from '@/lib/supabase/client'
+import { type UserProfile } from '@/types'
 
 interface AuthContextType {
   firebaseUser: User | null
   profile: UserProfile | null
   loading: boolean
-  isNewUser: boolean
-  supabaseClient: ReturnType<typeof createAuthenticatedClient> | ReturnType<typeof createClient>
-  signInGoogle: (role?: UserRole) => Promise<void>
-  signOut: () => Promise<void>
+  signInGoogle: () => Promise<void>
+  logout: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
 
-// ─── Context ──────────────────────────────────────────────────────────────────
-
 const AuthContext = createContext<AuthContextType | null>(null)
-
-// ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isNewUser, setIsNewUser] = useState(false)
-
-  const supabaseRef = useRef<ReturnType<typeof createAuthenticatedClient> | ReturnType<typeof createClient>>(
-    createClient()
-  )
-
-  // ─── Helpers ──────────────────────────────────────────────────────────────
-
-  const buildSupabaseClient = useCallback(async (user: User) => {
-    try {
-      const token = await user.getIdToken(/* forceRefresh */ false)
-      supabaseRef.current = createAuthenticatedClient(token)
-    } catch {
-      supabaseRef.current = createClient()
-    }
-  }, [])
+  const supabase = createClient()
 
   const fetchProfile = useCallback(async (uid: string) => {
-    const { data, error } = await supabaseRef.current
+    const { data } = await supabase
       .from('users')
       .select('*')
-      .eq('firebase_uid', uid)
-      .maybeSingle()
+      .eq('id', uid)
+      .single()
+    if (data) setProfile(data as UserProfile)
+  }, [supabase])
 
-    if (error) {
-      console.error('[AuthContext] fetchProfile error:', error.message)
-      return null
-    }
-    return data as UserProfile | null
-  }, [])
-
-  // ─── Firebase auth state listener ─────────────────────────────────────────
+  const upsertProfile = useCallback(async (user: User) => {
+    const { data } = await supabase
+      .from('users')
+      .upsert(
+        {
+          id: user.uid,
+          email: user.email,
+          full_name: user.displayName,
+          avatar_url: user.photoURL,
+          last_login: new Date().toISOString(),
+        },
+        { onConflict: 'id', ignoreDuplicates: false }
+      )
+      .select()
+      .single()
+    if (data) setProfile(data as UserProfile)
+  }, [supabase])
 
   useEffect(() => {
     const unsubscribe = onAuthChange(async (user) => {
+      setFirebaseUser(user)
       if (user) {
-        setFirebaseUser(user)
-        await buildSupabaseClient(user)
-        
-        const existingProfile = await fetchProfile(user.uid)
-        
-        if (!existingProfile) {
-          setIsNewUser(true)
-          setProfile(null)
-        } else {
-          setProfile(existingProfile)
-          // Also set isNewUser=true if they haven't finished onboarding (no username)
-          setIsNewUser(!existingProfile.username)
-        }
+        await upsertProfile(user)
       } else {
-        setFirebaseUser(null)
         setProfile(null)
-        setIsNewUser(false)
-        supabaseRef.current = createClient()
       }
-
       setLoading(false)
     })
-
     return unsubscribe
-  }, [buildSupabaseClient, fetchProfile])
+  }, [upsertProfile])
 
-  // ─── Public API ───────────────────────────────────────────────────────────
+  const signInGoogle = useCallback(async () => {
+    const user = await signInWithGoogle()
+    await upsertProfile(user)
+  }, [upsertProfile])
 
-  const signInGoogle = useCallback(
-    async (role?: UserRole) => {
-      const user = await signInWithGoogle()
-
-      // Immediately build authenticated client so the upsert works
-      await buildSupabaseClient(user)
-
-      // UPSERT into users table
-      const { error } = await supabaseRef.current
-        .from('users')
-        .upsert({
-          firebase_uid: user.uid,
-          email: user.email,
-          full_name: user.displayName, // Mapping display_name to full_name based on DB schema
-          avatar_url: user.photoURL,
-          role: role ?? 'user',
-          updated_at: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-        }, { onConflict: 'firebase_uid' })
-        
-      if (error) {
-        console.error('[AuthContext] signInGoogle upsert error:', error.message)
-      }
-
-      const saved = await fetchProfile(user.uid)
-      
-      setFirebaseUser(user)
-      setProfile(saved)
-      setIsNewUser(!saved?.username)
-    },
-    [buildSupabaseClient, fetchProfile]
-  )
-
-  const signOut = useCallback(async () => {
-    await firebaseSignOut()
-    setFirebaseUser(null)
+  const logout = useCallback(async () => {
+    await signOut()
     setProfile(null)
-    setIsNewUser(false)
-    supabaseRef.current = createClient()
   }, [])
 
   const refreshProfile = useCallback(async () => {
-    if (!firebaseUser) return
-    const data = await fetchProfile(firebaseUser.uid)
-    if (data) {
-      setProfile(data)
-      setIsNewUser(!data.username)
-    }
+    if (firebaseUser) await fetchProfile(firebaseUser.uid)
   }, [firebaseUser, fetchProfile])
-
-  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <AuthContext.Provider
-      value={{
-        firebaseUser,
-        profile,
-        loading,
-        isNewUser,
-        supabaseClient: supabaseRef.current,
-        signInGoogle,
-        signOut,
-        refreshProfile,
-      }}
+      value={{ firebaseUser, profile, loading, signInGoogle, logout, refreshProfile }}
     >
       {children}
     </AuthContext.Provider>
   )
 }
-
-// ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useAuth() {
   const ctx = useContext(AuthContext)

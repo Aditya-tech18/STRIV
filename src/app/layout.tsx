@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
-import { ReactQueryProvider } from '@/components/providers/ReactQueryProvider'
 import { Toaster } from '@/components/ui/Toaster'
 
 export const metadata: Metadata = {
@@ -85,12 +84,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-        <ReactQueryProvider>
-          <AuthProvider>
-            {children}
-            <Toaster />
-          </AuthProvider>
-        </ReactQueryProvider>
+        <AuthProvider>
+          {children}
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   )

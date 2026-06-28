@@ -1,38 +1,17 @@
 export type UserRole = 'user' | 'business' | 'admin'
 
-export type UserGoal =
-  | 'Fitness'
-  | 'Coding'
-  | 'Learning'
-  | 'Business'
-  | 'Health'
-  | 'Lifestyle'
-  | 'Other'
-
 export interface UserProfile {
   id: string
   full_name: string | null
   email: string | null
   avatar_url: string | null
   phone: string | null
-  username: string | null
-  bio: string | null
-  github_url: string | null
-  linkedin_url: string | null
-  portfolio_url: string | null
-  role: UserRole
-  goal: UserGoal | null
+  combat_name: string | null
+  goal: string | null
   goal_selected_at: string | null
   created_at: string | null
   last_login: string | null
   serial_id: number
-  business_name: string | null
-  // Denormalised stats (updated by triggers or app logic)
-  followers_count: number
-  following_count: number
-  total_streak_days: number
-  longest_streak: number
-  total_challenges_completed: number
 }
 
 export interface Challenge {
